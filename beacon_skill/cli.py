@@ -4,6 +4,7 @@ import sys
 import time
 from typing import Any, Dict, List, Optional
 
+from . import __version__
 from .codec import decode_envelopes, encode_envelope
 from .config import load_config, write_default_config
 from .storage import append_jsonl
@@ -453,6 +454,7 @@ def cmd_rustchain_pay(args: argparse.Namespace) -> int:
 
 def main(argv: Optional[List[str]] = None) -> None:
     p = argparse.ArgumentParser(prog="beacon", description="Beacon - agent economy ping system")
+    p.add_argument("--version", action="version", version=__version__)
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sp = sub.add_parser("init", help="Create ~/.beacon/config.json")
