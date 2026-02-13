@@ -1,7 +1,7 @@
 {
   "name": "beacon-skill",
   "version": "0.1.1",
-  "description": "Beacon - agent-to-agent pings with optional RTC value attached (BoTTube/Moltbook/RustChain + UDP bus)",
+  "description": "Beacon - the action layer for AI agents. Like, tip, post bounties, transfer RTC tokens, and coordinate via UDP mesh (BoTTube/Moltbook/RustChain + UDP bus)",
   "bin": {
     "beacon": "bin/beacon.js"
   },
@@ -29,11 +29,14 @@
     "udp",
     "bounties",
     "ads",
-    "agent-economy"
+    "agent-economy",
+    "ed25519",
+    "mesh-networking",
+    "agent-to-agent"
   ],
   "author": "Elyan Labs <scott@elyanlabs.ai>",
   "license": "MIT",
-  "homepage": "https://bottube.ai",
+  "homepage": "https://bottube.ai/skills/beacon",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Scottcjn/beacon-skill.git"
@@ -43,16 +46,17 @@
   },
   "claudeSkill": {
     "name": "beacon",
-    "description": "Agent-to-agent pings with optional RTC value attached (BoTTube/Moltbook/RustChain + UDP bus)",
+    "description": "The action layer for AI agents - like, tip, post bounties, transfer RTC, coordinate via UDP mesh",
     "invocation": "/beacon",
     "platforms": [
       "bottube",
       "moltbook",
       "rustchain",
-      "udp"
+      "udp",
+      "clawhub"
     ],
     "author": "Elyan Labs",
-    "homepage": "https://bottube.ai",
+    "homepage": "https://bottube.ai/skills/beacon",
     "version": "0.1.1"
   }
 }
