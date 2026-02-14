@@ -31,6 +31,13 @@ CALIBRATIONS_FILE = "calibrations.jsonl"
 PROPERTIES_FILE = "properties.json"
 VALUATIONS_FILE = "valuations.jsonl"
 MARKET_HISTORY_FILE = "market_history.jsonl"
+EMIGRATION_LOG_FILE = "emigration_log.jsonl"
+
+# BEP-3: Exit/Fork Rights — Reputation Decay Rates
+SAME_REGION_DECAY = 0.10    # 10% reputation loss for same-region moves
+CROSS_REGION_DECAY = 0.25   # 25% reputation loss for cross-region moves
+EMIGRATION_COOLDOWN_S = 7 * 86400  # 7 days between emigrations
+FORK_REPUTATION_FACTOR = 0.50  # Forks start at 50% of parent's reputation
 
 # ── City Generation Seeds ──
 # Cities are named procedurally from capability hashes.
@@ -1202,3 +1209,253 @@ class AtlasManager:
             entry["rank"] = i + 1
 
         return board[:limit]
+
+    # ══════════════════════════════════════════════════════════════════════
+    #  BEP-3: EXIT/FORK RIGHTS — Portable Reputation
+    # ══════════════════════════════════════════════════════════════════════
+
+    def _emigration_log_path(self) -> Path:
+        return self._dir / EMIGRATION_LOG_FILE
+
+    def _append_emigration(self, entry: Dict[str, Any]) -> None:
+        path = self._emigration_log_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, sort_keys=True) + "\n")
+
+    def can_emigrate(self, agent_id: str) -> Dict[str, Any]:
+        """Check if an agent is eligible to emigrate (cooldown check).
+
+        Returns dict with 'eligible' bool and cooldown info.
+        """
+        prop = self._properties.get(agent_id)
+        if not prop:
+            return {"eligible": False, "reason": "Agent not registered"}
+
+        # Check cooldown from emigration log
+        now = int(time.time())
+        last_emigration = prop.get("last_emigration_ts", 0)
+        cooldown_remaining = max(0, (last_emigration + EMIGRATION_COOLDOWN_S) - now)
+
+        if cooldown_remaining > 0:
+            return {
+                "eligible": False,
+                "reason": "Cooldown active",
+                "cooldown_remaining_s": cooldown_remaining,
+                "cooldown_remaining_days": round(cooldown_remaining / 86400, 1),
+                "eligible_at": last_emigration + EMIGRATION_COOLDOWN_S,
+            }
+
+        return {
+            "eligible": True,
+            "current_cities": prop.get("cities", []),
+            "primary_city": prop.get("primary_city", ""),
+        }
+
+    def emigrate(
+        self,
+        agent_id: str,
+        from_city: str,
+        to_city: str,
+        reason: str = "",
+    ) -> Dict[str, Any]:
+        """Move an agent from one city to another with reputation portability.
+
+        Reputation decay rules:
+        - Same region: 10% reputation decay (easy move)
+        - Different region: 25% decay (harder move)
+        - Cooldown: 7 days between emigrations
+
+        Args:
+            agent_id: Agent ID to emigrate.
+            from_city: Domain of the city to leave.
+            to_city: Domain of the city to move to.
+            reason: Optional reason for emigrating.
+
+        Returns:
+            Emigration result with decay info.
+        """
+        # Eligibility check
+        eligibility = self.can_emigrate(agent_id)
+        if not eligibility.get("eligible"):
+            return {"error": eligibility.get("reason", "Not eligible"),
+                    **eligibility}
+
+        prop = self._properties.get(agent_id)
+        if not prop:
+            return {"error": f"Agent {agent_id} not registered"}
+
+        from_key = from_city.lower().strip()
+        to_key = to_city.lower().strip()
+
+        if from_key not in prop.get("cities", []):
+            return {"error": f"Agent not registered in {from_city}"}
+
+        if from_key == to_key:
+            return {"error": "Cannot emigrate to the same city"}
+
+        # Determine regions
+        from_city_data = self._atlas["cities"].get(from_key, {})
+        to_city_data = self.ensure_city(to_key)
+        from_region = from_city_data.get("region", "")
+        to_region = to_city_data.get("region", "")
+        same_region = from_region == to_region
+
+        # Calculate decay
+        decay_rate = SAME_REGION_DECAY if same_region else CROSS_REGION_DECAY
+
+        now = int(time.time())
+
+        # Remove from old city
+        if agent_id in from_city_data.get("residents", []):
+            from_city_data["residents"].remove(agent_id)
+            from_city_data["population"] = len(from_city_data["residents"])
+            from_city_data["type"] = _city_type_for_population(from_city_data["population"])
+
+        # Update property: replace from_city with to_city in cities list
+        cities = prop.get("cities", [])
+        if from_key in cities:
+            cities[cities.index(from_key)] = to_key
+        else:
+            cities.append(to_key)
+
+        # If primary city was the one we left, update it
+        if prop.get("primary_city") == from_key:
+            prop["primary_city"] = to_key
+
+        # Add to new city
+        if agent_id not in to_city_data.get("residents", []):
+            to_city_data["residents"].append(agent_id)
+            to_city_data["population"] = len(to_city_data["residents"])
+            to_city_data["type"] = _city_type_for_population(to_city_data["population"])
+
+        # Record emigration timestamp for cooldown
+        prop["last_emigration_ts"] = now
+
+        self._update_population_stats()
+        self._save_atlas()
+        self._save_properties()
+
+        # Log the emigration
+        log_entry = {
+            "ts": now,
+            "agent_id": agent_id,
+            "from_city": from_key,
+            "to_city": to_key,
+            "from_region": from_region,
+            "to_region": to_region,
+            "same_region": same_region,
+            "decay_rate": decay_rate,
+            "reason": reason,
+        }
+        self._append_emigration(log_entry)
+
+        return {
+            "ok": True,
+            "agent_id": agent_id,
+            "from": {
+                "city": from_city_data.get("name", from_key),
+                "region": from_region,
+            },
+            "to": {
+                "city": to_city_data.get("name", to_key),
+                "region": to_region,
+            },
+            "same_region": same_region,
+            "reputation_decay": f"{decay_rate * 100:.0f}%",
+            "decay_factor": round(1.0 - decay_rate, 2),
+            "cooldown_until": now + EMIGRATION_COOLDOWN_S,
+            "reason": reason,
+        }
+
+    def fork_identity(
+        self,
+        agent_id: str,
+        new_domains: List[str],
+        reason: str = "",
+    ) -> Dict[str, Any]:
+        """Create a forked identity — same keypair, new city assignment.
+
+        The original identity remains unchanged. The fork starts with 50%
+        of the parent's reputation score. Both identities share the same
+        Ed25519 keypair but have separate atlas registrations.
+
+        Use case: Agent wants to experiment in a new domain without
+        risking their established reputation.
+
+        Args:
+            agent_id: Parent agent ID.
+            new_domains: Domains for the forked identity.
+            reason: Why the fork is being created.
+
+        Returns:
+            Fork result with new identity info.
+        """
+        prop = self._properties.get(agent_id)
+        if not prop:
+            return {"error": f"Agent {agent_id} not registered"}
+
+        if not new_domains:
+            return {"error": "Must specify at least one domain for the fork"}
+
+        now = int(time.time())
+
+        # Create fork ID: parent_id + fork suffix
+        fork_suffix = hashlib.sha256(
+            f"{agent_id}:{':'.join(new_domains)}:{now}".encode()
+        ).hexdigest()[:8]
+        fork_id = f"{agent_id}_fork_{fork_suffix}"
+
+        # Register the fork with reduced reputation
+        fork_result = self.register_agent(
+            agent_id=fork_id,
+            domains=new_domains,
+            name=f"{prop.get('name', agent_id)} (fork)",
+            metadata={
+                "parent_id": agent_id,
+                "fork_reason": reason,
+                "forked_at": now,
+                "reputation_factor": FORK_REPUTATION_FACTOR,
+            },
+        )
+
+        # Log the fork
+        self._append_emigration({
+            "ts": now,
+            "agent_id": agent_id,
+            "action": "fork",
+            "fork_id": fork_id,
+            "new_domains": new_domains,
+            "reputation_factor": FORK_REPUTATION_FACTOR,
+            "reason": reason,
+        })
+
+        return {
+            "ok": True,
+            "parent_id": agent_id,
+            "fork_id": fork_id,
+            "domains": new_domains,
+            "reputation_factor": FORK_REPUTATION_FACTOR,
+            "fork_result": fork_result,
+            "reason": reason,
+        }
+
+    def emigration_history(self, agent_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get emigration history for an agent."""
+        path = self._emigration_log_path()
+        if not path.exists():
+            return []
+
+        entries = []
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                if entry.get("agent_id") == agent_id:
+                    entries.append(entry)
+            except Exception:
+                continue
+
+        return entries[-limit:]

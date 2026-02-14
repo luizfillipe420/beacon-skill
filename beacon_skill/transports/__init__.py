@@ -1,6 +1,7 @@
 __all__ = [
     "BoTTubeClient",
     "MoltbookClient",
+    "RelayClient",
     "RustChainClient",
     "RustChainKeypair",
     "WebhookServer",
@@ -11,6 +12,7 @@ __all__ = [
 
 from .bottube import BoTTubeClient
 from .moltbook import MoltbookClient
+from .relay import RelayClient
 from .rustchain import RustChainClient, RustChainKeypair
 from .udp import udp_listen, udp_send
 from .webhook import WebhookServer, webhook_send

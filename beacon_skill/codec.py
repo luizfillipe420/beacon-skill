@@ -11,6 +11,34 @@ BEACON_VERSION = 2
 BEACON_HEADER_PREFIX = "[BEACON v"
 NONCE_BYTES = 6  # 12 hex chars
 
+# Known envelope kinds — used by modules to set the "kind" field in payloads.
+# The codec itself is kind-agnostic; this list serves as a protocol reference.
+ENVELOPE_KINDS = {
+    # Core protocol
+    "heartbeat",
+    "accord_offer",
+    "accord_accept",
+    "accord_reject",
+    "atlas_register",
+    # BEP-1: Proof-of-Thought
+    "thought_proof",
+    "thought_challenge",
+    "thought_reveal",
+    # BEP-2: External Agent Relay
+    "relay_register",
+    "relay_heartbeat",
+    # BEP-4: Memory Markets
+    "market_listing",
+    "market_purchase",
+    "market_rental",
+    "amnesia_request",
+    "amnesia_vote",
+    # BEP-5: Hybrid Districts
+    "hybrid_sponsor",
+    "hybrid_cosign",
+    "hybrid_revoke",
+}
+
 
 def generate_nonce() -> str:
     """Generate a 12-char hex nonce for replay protection."""
