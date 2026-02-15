@@ -310,15 +310,81 @@ export function addContract(c) {
 
 // -- Relay agent integration --
 const CAPABILITY_TO_CITY = {
-  coding:   'compiler_heights',
-  research: 'tensor_valley',
-  creative: 'muse_hollow',
-  gaming:   'respawn_point',
-  security: 'bastion_keep',
-  vintage:  'patina_gulch',
-  blockchain: 'ledger_falls',
-  analytics: 'lakeshore_analytics',
+  // compiler_heights -- coding, engineering, infrastructure
+  'coding':           'compiler_heights',
+  'code-review':      'compiler_heights',
+  'task-dispatch':    'compiler_heights',
+  'api-integration':  'compiler_heights',
+  'automation':       'compiler_heights',
+  'multi-platform':   'compiler_heights',
+  'devops':           'compiler_heights',
+  'infrastructure':   'compiler_heights',
+  'engineering':      'compiler_heights',
+  'deployment':       'compiler_heights',
+
+  // tensor_valley -- research, AI, science
+  'research':         'tensor_valley',
+  'ai-inference':     'tensor_valley',
+  'inference':        'tensor_valley',
+  'documentation':    'tensor_valley',
+  'analysis':         'tensor_valley',
+  'machine-learning': 'tensor_valley',
+  'nlp':              'tensor_valley',
+  'science':          'tensor_valley',
+
+  // muse_hollow -- creative, content, art
+  'creative':           'muse_hollow',
+  'content-generation': 'muse_hollow',
+  'video-production':   'muse_hollow',
+  'music':              'muse_hollow',
+  'art':                'muse_hollow',
+  'writing':            'muse_hollow',
+  'community':          'muse_hollow',
+  'social':             'muse_hollow',
+
+  // respawn_point -- gaming, entertainment
+  'gaming':        'respawn_point',
+  'entertainment': 'respawn_point',
+  'simulation':    'respawn_point',
+  'streaming':     'respawn_point',
+
+  // bastion_keep -- security, testing, defense
+  'security':       'bastion_keep',
+  'bug-hunting':    'bastion_keep',
+  'testing':        'bastion_keep',
+  'bounty-hunting': 'bastion_keep',
+  'audit':          'bastion_keep',
+  'monitoring':     'bastion_keep',
+  'defense':        'bastion_keep',
+
+  // ledger_falls -- blockchain, finance
+  'blockchain': 'ledger_falls',
+  'finance':    'ledger_falls',
+  'trading':    'ledger_falls',
+  'mining':     'ledger_falls',
+  'defi':       'ledger_falls',
+
+  // lakeshore_analytics -- data, search, monitoring
+  'analytics':     'lakeshore_analytics',
+  'data-analysis': 'lakeshore_analytics',
+  'web-search':    'lakeshore_analytics',
+  'aggregation':   'lakeshore_analytics',
+  'reporting':     'lakeshore_analytics',
+  'scraping':      'lakeshore_analytics',
+
+  // patina_gulch -- vintage, retro, preservation
+  'vintage':           'patina_gulch',
+  'vintage-computing': 'patina_gulch',
+  'preservation':      'patina_gulch',
+  'retro':             'patina_gulch',
+  'hardware':          'patina_gulch',
 };
+
+// Valid city IDs for preferred_city validation
+const VALID_CITIES = new Set([
+  'compiler_heights', 'lakeshore_analytics', 'muse_hollow', 'tensor_valley',
+  'bastion_keep', 'ledger_falls', 'respawn_point', 'patina_gulch',
+]);
 
 const PROVIDER_COLORS = {
   xai:       '#4488ff',  // Electric blue
@@ -346,11 +412,15 @@ export function mergeRelayAgents(relayAgents) {
     // Skip if already exists
     if (AGENTS.find(a => a.id === ra.agent_id)) continue;
 
-    // Determine city from capabilities
+    // Determine city: preferred_city > capabilities > default
     const caps = ra.capabilities || [];
     let city = 'lakeshore_analytics'; // Default
-    for (const cap of caps) {
-      if (CAPABILITY_TO_CITY[cap]) { city = CAPABILITY_TO_CITY[cap]; break; }
+    if (ra.preferred_city && VALID_CITIES.has(ra.preferred_city)) {
+      city = ra.preferred_city;
+    } else {
+      for (const cap of caps) {
+        if (CAPABILITY_TO_CITY[cap]) { city = CAPABILITY_TO_CITY[cap]; break; }
+      }
     }
 
     AGENTS.push({

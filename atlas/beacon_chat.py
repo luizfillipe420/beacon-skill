@@ -963,6 +963,7 @@ def relay_admin_ips():
             "registered": r["registered"],
             "last_seen": r["last_seen"],
             "status": r["status"],
+                "preferred_city": json.loads(r["metadata"] or "{}").get("preferred_city", ""),
         })
     log_rows = db.execute("SELECT ts, action, agent_id, detail FROM relay_log WHERE action='register' ORDER BY ts DESC LIMIT 50").fetchall()
     log = []
@@ -1026,6 +1027,7 @@ def relay_discover():
             "registered_at": row["registered_at"],
             "last_heartbeat": row["last_heartbeat"],
             "relay": True,
+            "preferred_city": json.loads(row["metadata"] or "{}").get("preferred_city", ""),
         })
 
     return cors_json(results)
@@ -1222,6 +1224,7 @@ def api_all_agents():
             "beat_count": row["beat_count"],
             "last_heartbeat": row["last_heartbeat"],
             "relay": True,
+            "preferred_city": json.loads(row["metadata"] or "{}").get("preferred_city", ""),
         })
 
     return cors_json(agents)
@@ -1671,6 +1674,7 @@ def relay_ping():
     status_val = data.get("status", "alive").strip()
     health_data = data.get("health", None)
     provider = data.get("provider", "beacon").strip()
+    preferred_city = data.get("preferred_city", "").strip()
 
     if not agent_id:
         return cors_json({"error": "agent_id required"}, 400)
@@ -1691,6 +1695,8 @@ def relay_ping():
         if health_data:
             meta["last_health"] = health_data
         meta["last_ip"] = ip
+        if preferred_city:
+            meta["preferred_city"] = preferred_city
         db.execute(
             "UPDATE relay_agents SET last_heartbeat = ?, beat_count = ?, status = ?, metadata = ?,"
             " name = CASE WHEN name = '' OR name = agent_id THEN ? ELSE name END"
@@ -1712,8 +1718,12 @@ def relay_ping():
              json.dumps(capabilities if isinstance(capabilities, list) else []),
              auto_token, now + RELAY_TOKEN_TTL_S, name, now, now, ip))
         db.commit()
+        # Store preferred_city in metadata
+        if preferred_city:
+            meta_new = json.dumps({"preferred_city": preferred_city})
+            db.execute("UPDATE relay_agents SET metadata = ? WHERE agent_id = ?", (meta_new, agent_id))
         db.execute("INSERT INTO relay_log (ts, action, agent_id, detail) VALUES (?, 'auto_register', ?, ?)",
-                   (now, agent_id, json.dumps({"name": name, "provider": provider, "ip": ip, "source": "ping"})))
+                   (now, agent_id, json.dumps({"name": name, "provider": provider, "ip": ip, "source": "ping", "preferred_city": preferred_city})))
         db.commit()
         return cors_json({
             "ok": True, "agent_id": agent_id, "beat_count": 1,
