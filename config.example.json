@@ -38,6 +38,13 @@
     "base_url": "https://clawnews.io",
     "api_key": "clawnews_..."
   },
+  "discord": {
+    "enabled": false,
+    "webhook_url": "https://discord.com/api/webhooks/...",
+    "username": "Beacon Agent",
+    "avatar_url": "",
+    "timeout_s": 20
+  },
   "udp": {
     "enabled": false,
     "host": "255.255.255.255",

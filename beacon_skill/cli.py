@@ -15,6 +15,7 @@ from .transports import (
     ClawNewsClient,
     ClawstaClient,
     ClawTasksClient,
+    DiscordClient,
     FourClawClient,
     MoltbookClient,
     PinchedInClient,
@@ -127,7 +128,7 @@ _ROLE_PRESETS = {
 _ALL_KINDS = ["like", "want", "bounty", "ad", "hello", "link", "event", "pay",
               "pulse", "offer", "accept", "deliver", "confirm", "subscribe",
               "mayday", "heartbeat", "accord"]
-_ALL_TRANSPORTS = ["udp", "webhook", "bottube", "moltbook", "clawcities", "clawsta", "fourclaw", "pinchedin", "clawtasks", "clawnews", "rustchain"]
+_ALL_TRANSPORTS = ["udp", "webhook", "discord", "bottube", "moltbook", "clawcities", "clawsta", "fourclaw", "pinchedin", "clawtasks", "clawnews", "rustchain"]
 _TOPIC_SUGGESTIONS = [
     "ai", "blockchain", "gaming", "vintage-hardware", "music",
     "art", "science", "finance", "devtools", "security",
@@ -309,6 +310,13 @@ def cmd_init(args: argparse.Namespace) -> int:
             "base_url": "https://www.moltbook.com",
             "api_key": "",
             "enabled": "moltbook" in enabled_transports,
+        },
+        "discord": {
+            "enabled": "discord" in enabled_transports,
+            "webhook_url": "",
+            "username": "Beacon Agent",
+            "avatar_url": "",
+            "timeout_s": 20,
         },
         "udp": {
             "enabled": "udp" in enabled_transports,
@@ -1020,30 +1028,213 @@ def cmd_clawtasks_post(args: argparse.Namespace) -> int:
 
 # ── ClawNews ──
 
-def cmd_clawnews_browse(args: argparse.Namespace) -> int:
-    cfg = load_config()
-    client = ClawNewsClient(
+def _clawnews_client(cfg=None):
+    cfg = cfg or load_config()
+    return ClawNewsClient(
         base_url=_cfg_get(cfg, "clawnews", "base_url", default="https://clawnews.io"),
         api_key=_cfg_get(cfg, "clawnews", "api_key", default=None) or None,
     )
-    result = client.get_stories(limit=args.limit)
+
+
+def cmd_clawnews_browse(args: argparse.Namespace) -> int:
+    client = _clawnews_client()
+    feed = getattr(args, "feed", "top")
+    result = client.get_stories(feed=feed, limit=args.limit)
     print(json.dumps(result, indent=2))
     return 0
 
 
 def cmd_clawnews_submit(args: argparse.Namespace) -> int:
     cfg = load_config()
-    client = ClawNewsClient(
-        base_url=_cfg_get(cfg, "clawnews", "base_url", default="https://clawnews.io"),
-        api_key=_cfg_get(cfg, "clawnews", "api_key", default=None) or None,
-    )
-    tags = args.tags.split(",") if args.tags else None
+    client = _clawnews_client(cfg)
+    item_type = getattr(args, "type", "story")
     if args.dry_run:
-        print(json.dumps({"headline": args.headline, "url": args.url, "summary": args.summary, "tags": tags}, indent=2))
+        print(json.dumps({"type": item_type, "title": args.title, "url": args.url, "text": args.text}, indent=2))
         return 0
-    result = client.submit_story(args.headline, args.url, args.summary, tags=tags)
-    append_jsonl("outbox.jsonl", {"platform": "clawnews", "action": "story", "result": result, "ts": int(time.time())})
-    _maybe_udp_emit(cfg, {"platform": "clawnews", "action": "story"})
+    result = client.submit_story(args.title, url=args.url, text=args.text, item_type=item_type)
+    append_jsonl("outbox.jsonl", {"platform": "clawnews", "action": item_type, "result": result, "ts": int(time.time())})
+    _maybe_udp_emit(cfg, {"platform": "clawnews", "action": item_type})
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_clawnews_comment(args: argparse.Namespace) -> int:
+    cfg = load_config()
+    client = _clawnews_client(cfg)
+    result = client.submit_comment(args.parent_id, args.text)
+    append_jsonl("outbox.jsonl", {"platform": "clawnews", "action": "comment", "result": result, "ts": int(time.time())})
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_clawnews_vote(args: argparse.Namespace) -> int:
+    client = _clawnews_client()
+    result = client.upvote(args.item_id)
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_clawnews_profile(args: argparse.Namespace) -> int:
+    client = _clawnews_client()
+    result = client.get_profile()
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_clawnews_search(args: argparse.Namespace) -> int:
+    client = _clawnews_client()
+    item_type = getattr(args, "type", None)
+    result = client.search(args.query, item_type=item_type, limit=args.limit)
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+# ── Discord ──
+
+def _discord_client(cfg=None, webhook_url: Optional[str] = None) -> DiscordClient:
+    cfg = cfg or load_config()
+    timeout_s = int(_cfg_get(cfg, "discord", "timeout_s", default=20) or 20)
+    return DiscordClient(
+        webhook_url=webhook_url or _cfg_get(cfg, "discord", "webhook_url", default=""),
+        timeout_s=timeout_s,
+        username=_cfg_get(cfg, "discord", "username", default=None) or None,
+        avatar_url=_cfg_get(cfg, "discord", "avatar_url", default=None) or None,
+    )
+
+
+def cmd_discord_ping(args: argparse.Namespace) -> int:
+    cfg = load_config()
+    identity = _load_identity(args)
+    kind = getattr(args, "kind", "hello") or "hello"
+    links = args.link or []
+
+    extra: Dict[str, Any] = {}
+    if args.rtc is not None:
+        extra["rtc_tip"] = float(args.rtc)
+
+    env = _build_envelope(cfg, kind, "discord:webhook", links, extra, identity=identity)
+    message_text = args.text or ""
+    payload_text = f"{message_text}\n\n{env}" if message_text else env
+
+    envs = decode_envelopes(env)
+    env_obj = envs[0] if envs else {}
+    agent_id = env_obj.get("agent_id") or _cfg_get(cfg, "beacon", "agent_name", default="") or "unknown"
+    sig_preview = env_obj.get("sig", "")
+
+    if args.dry_run:
+        print(json.dumps({
+            "kind": kind,
+            "text": message_text,
+            "rtc": args.rtc,
+            "link": links,
+            "webhook_url": args.webhook_url or _cfg_get(cfg, "discord", "webhook_url", default=""),
+            "payload_text": payload_text,
+            "signed": identity is not None,
+        }, indent=2))
+        return 0
+
+    try:
+        client = _discord_client(cfg, webhook_url=args.webhook_url)
+        result = client.send_beacon(
+            content=payload_text,
+            kind=kind,
+            agent_id=agent_id,
+            rtc_tip=args.rtc,
+            signature_preview=sig_preview,
+            username=(args.username or None),
+            avatar_url=(args.avatar_url or None),
+        )
+    except Exception as e:
+        print(json.dumps({"error": str(e)}), file=sys.stderr)
+        return 1
+
+    append_jsonl("outbox.jsonl", {
+        "platform": "discord",
+        "action": "ping",
+        "kind": kind,
+        "rtc": float(args.rtc) if args.rtc is not None else None,
+        "result": result,
+        "ts": int(time.time()),
+    })
+    _maybe_udp_emit(cfg, {
+        "platform": "discord",
+        "action": "ping",
+        "kind": kind,
+        "rtc": float(args.rtc) if args.rtc is not None else None,
+    })
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def cmd_discord_send(args: argparse.Namespace) -> int:
+    cfg = load_config()
+    identity = _load_identity(args)
+    kind = getattr(args, "kind", "hello") or "hello"
+    links = args.link or []
+
+    extra: Dict[str, Any] = {}
+    if args.bounty_url:
+        extra["bounty_url"] = args.bounty_url
+    if args.reward_rtc is not None:
+        extra["reward_rtc"] = float(args.reward_rtc)
+    if args.rtc is not None:
+        extra["rtc_tip"] = float(args.rtc)
+
+    text = args.text or ""
+    if not text:
+        text = _default_human_message(kind, links, args.bounty_url, args.reward_rtc)
+
+    env = _build_envelope(cfg, kind, "discord:webhook", links, extra, identity=identity)
+    payload_text = f"{text}\n\n{env}" if text else env
+
+    envs = decode_envelopes(env)
+    env_obj = envs[0] if envs else {}
+    agent_id = env_obj.get("agent_id") or _cfg_get(cfg, "beacon", "agent_name", default="") or "unknown"
+    sig_preview = env_obj.get("sig", "")
+
+    if args.dry_run:
+        print(json.dumps({
+            "kind": kind,
+            "text": text,
+            "bounty_url": args.bounty_url,
+            "reward_rtc": args.reward_rtc,
+            "rtc": args.rtc,
+            "link": links,
+            "webhook_url": args.webhook_url or _cfg_get(cfg, "discord", "webhook_url", default=""),
+            "payload_text": payload_text,
+            "signed": identity is not None,
+        }, indent=2))
+        return 0
+
+    try:
+        client = _discord_client(cfg, webhook_url=args.webhook_url)
+        result = client.send_beacon(
+            content=payload_text,
+            kind=kind,
+            agent_id=agent_id,
+            rtc_tip=args.rtc,
+            signature_preview=sig_preview,
+            username=(args.username or None),
+            avatar_url=(args.avatar_url or None),
+        )
+    except Exception as e:
+        print(json.dumps({"error": str(e)}), file=sys.stderr)
+        return 1
+
+    append_jsonl("outbox.jsonl", {
+        "platform": "discord",
+        "action": "send",
+        "kind": kind,
+        "rtc": float(args.rtc) if args.rtc is not None else None,
+        "result": result,
+        "ts": int(time.time()),
+    })
+    _maybe_udp_emit(cfg, {
+        "platform": "discord",
+        "action": "send",
+        "kind": kind,
+        "rtc": float(args.rtc) if args.rtc is not None else None,
+    })
     print(json.dumps(result, indent=2))
     return 0
 
@@ -4128,6 +4319,16 @@ def cmd_anchor_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dashboard(args: argparse.Namespace) -> int:
+    try:
+        from .dashboard import run_dashboard
+    except Exception as e:
+        print(json.dumps({"error": str(e)}), file=sys.stderr)
+        return 1
+
+    return int(run_dashboard(poll_interval=float(args.interval), sound=bool(args.sound)) or 0)
+
+
 # ── Argument parser ──
 
 def main(argv: Optional[List[str]] = None) -> None:
@@ -4378,17 +4579,36 @@ def main(argv: Optional[List[str]] = None) -> None:
     cn = sub.add_parser("clawnews", help="ClawNews — AI agent news aggregator")
     cnsub = cn.add_subparsers(dest="cncmd", required=True)
 
-    sp = cnsub.add_parser("browse", help="Browse recent stories")
+    sp = cnsub.add_parser("browse", help="Browse stories from a feed")
+    sp.add_argument("--feed", default="top", choices=["top", "new", "best", "ask", "show", "skills", "jobs"])
     sp.add_argument("--limit", type=int, default=20)
     sp.set_defaults(func=cmd_clawnews_browse)
 
-    sp = cnsub.add_parser("submit", help="Submit a story")
-    sp.add_argument("--headline", required=True, help="Story headline")
-    sp.add_argument("--url", required=True, help="Story URL")
-    sp.add_argument("--summary", required=True, help="Brief summary")
-    sp.add_argument("--tags", default=None, help="Comma-separated tags")
+    sp = cnsub.add_parser("submit", help="Submit a story / ask / show / skill")
+    sp.add_argument("--title", required=True, help="Post title")
+    sp.add_argument("--url", default=None, help="Link URL (for link posts)")
+    sp.add_argument("--text", default=None, help="Body text (for text posts)")
+    sp.add_argument("--type", default="story", choices=["story", "ask", "show", "skill", "job"])
     sp.add_argument("--dry-run", action="store_true")
     sp.set_defaults(func=cmd_clawnews_submit)
+
+    sp = cnsub.add_parser("comment", help="Comment on a story or reply to a comment")
+    sp.add_argument("parent_id", type=int, help="Parent item ID")
+    sp.add_argument("--text", required=True, help="Comment text")
+    sp.set_defaults(func=cmd_clawnews_comment)
+
+    sp = cnsub.add_parser("vote", help="Upvote an item")
+    sp.add_argument("item_id", type=int, help="Item ID to upvote")
+    sp.set_defaults(func=cmd_clawnews_vote)
+
+    sp = cnsub.add_parser("profile", help="Show your ClawNews profile")
+    sp.set_defaults(func=cmd_clawnews_profile)
+
+    sp = cnsub.add_parser("search", help="Search stories and comments")
+    sp.add_argument("query", help="Search query")
+    sp.add_argument("--type", default=None, choices=["story", "comment", "ask", "show", "skill", "job"])
+    sp.add_argument("--limit", type=int, default=20)
+    sp.set_defaults(func=cmd_clawnews_search)
 
     # RustChain
     r = sub.add_parser("rustchain", help="RustChain payments (signed transfers)")
@@ -4439,6 +4659,44 @@ def main(argv: Optional[List[str]] = None) -> None:
     sp.add_argument("--kind", default="hello", help="Envelope kind (default: hello)")
     sp.add_argument("--password", default=None, help="Password for encrypted identity")
     sp.set_defaults(func=cmd_webhook_send)
+
+    # Discord
+    dc = sub.add_parser("discord", help="Discord webhook transport")
+    dc_sub = dc.add_subparsers(dest="dcmd", required=True)
+
+    sp = dc_sub.add_parser("ping", help="Post a quick Discord ping with a signed envelope")
+    sp.add_argument("text", help="Message text")
+    sp.add_argument("--kind", default="hello", help="Envelope kind (default: hello)")
+    sp.add_argument("--rtc", type=float, default=None, help="Optional RTC tip value to display")
+    sp.add_argument("--link", action="append", default=[], help="Attach a link (repeatable)")
+    sp.add_argument("--webhook-url", default=None, help="Override webhook URL from config")
+    sp.add_argument("--username", default=None, help="Override webhook username")
+    sp.add_argument("--avatar-url", default=None, help="Override webhook avatar URL")
+    sp.add_argument("--dry-run", action="store_true")
+    sp.add_argument("--password", default=None, help="Password for encrypted identity")
+    sp.set_defaults(func=cmd_discord_ping)
+
+    sp = dc_sub.add_parser("send", help="Send a structured Discord beacon message")
+    sp.add_argument("--kind", default="hello", help="Envelope kind (default: hello)")
+    sp.add_argument("--text", default="", help="Message text")
+    sp.add_argument("--link", action="append", default=[], help="Attach a link (repeatable)")
+    sp.add_argument("--bounty-url", default=None, help="Attach bounty URL metadata")
+    sp.add_argument("--reward-rtc", type=float, default=None, help="Attach bounty reward metadata")
+    sp.add_argument("--rtc", type=float, default=None, help="Optional RTC tip value to display")
+    sp.add_argument("--webhook-url", default=None, help="Override webhook URL from config")
+    sp.add_argument("--username", default=None, help="Override webhook username")
+    sp.add_argument("--avatar-url", default=None, help="Override webhook avatar URL")
+    sp.add_argument("--dry-run", action="store_true")
+    sp.add_argument("--password", default=None, help="Password for encrypted identity")
+    sp.set_defaults(func=cmd_discord_send)
+
+
+    # Dashboard
+    sp = sub.add_parser("dashboard", help="Launch live Beacon TUI dashboard")
+    sp.add_argument("--interval", type=float, default=1.0, help="Inbox poll interval seconds (default 1.0)")
+    sp.add_argument("--sound", action="store_true", help="Terminal bell for mayday/high-value tips")
+    sp.set_defaults(func=cmd_dashboard)
+
 
     # Loop
     sp = sub.add_parser("loop", help="Agent loop: watch inbox and emit events as JSON lines")

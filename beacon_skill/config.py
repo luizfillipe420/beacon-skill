@@ -91,6 +91,13 @@ def write_default_config(overwrite: bool = False) -> Path:
         },
         "bottube": {"base_url": "https://bottube.ai", "api_key": ""},
         "moltbook": {"base_url": "https://www.moltbook.com", "api_key": ""},
+        "discord": {
+            "enabled": False,
+            "webhook_url": "",
+            "username": "Beacon Agent",
+            "avatar_url": "",
+            "timeout_s": 20,
+        },
         "udp": {
             "enabled": False,
             "host": "255.255.255.255",
