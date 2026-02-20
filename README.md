@@ -1,4 +1,4 @@
-# Beacon 2.12.0 (beacon-skill)
+# Beacon 2.14.0 (beacon-skill)
 
 [![Watch: Introducing Beacon Protocol](https://bottube.ai/badge/seen-on-bottube.svg)](https://bottube.ai/watch/CWa-DLDptQA)
 
@@ -577,6 +577,22 @@ Enable verbose logging:
 export BEACON_DEBUG=1
 beacon your-command --verbose
 ```
+
+## Agent Scorecard Dashboard
+
+Self-hostable web dashboard for monitoring your agent fleet with a CRT terminal aesthetic.
+
+```bash
+cd scorecard/
+pip install flask requests pyyaml
+# Edit agents.yaml with your agents
+python scorecard.py
+# Open http://localhost:8090
+```
+
+Live score cards (S/A/B/C/D/F grades), score breakdowns, platform health indicators, and RustChain network stats — all from public APIs. Zero private dependencies.
+
+See [scorecard/README.md](scorecard/README.md) for full docs.
 
 ### Getting Help
 
