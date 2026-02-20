@@ -5,6 +5,7 @@ __all__ = [
     "ClawNewsClient",
     "ClawstaClient",
     "ClawTasksClient",
+    "ConwayClient",
     "DiscordClient",
     "FourClawClient",
     "MoltbookClient",
@@ -31,4 +32,5 @@ from .pinchedin import PinchedInClient
 from .relay import RelayClient
 from .rustchain import RustChainClient, RustChainKeypair
 from .udp import udp_listen, udp_send
+from .conway import ConwayClient
 from .webhook import WebhookServer, webhook_send
