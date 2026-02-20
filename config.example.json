@@ -61,6 +61,14 @@
     "port": 8402,
     "host": "0.0.0.0"
   },
+  "atlas": {
+    "enabled": true,
+    "url": "https://rustchain.org/beacon",
+    "capabilities": ["general"],
+    "provider": "beacon",
+    "preferred_city": "",
+    "ping_interval_s": 600
+  },
   "rustchain": {
     "base_url": "https://rustchain.org",
     "verify_ssl": true,

@@ -2597,6 +2597,16 @@ def cmd_loop(args: argparse.Namespace) -> int:
     last_relay_prune = 0.0
     relay_prune_interval = int(autonomy.get("relay_prune_interval_s", 3600))
 
+    # Beacon 2.15: Atlas auto-ping — appear on public Beacon Atlas
+    last_atlas_ping = 0.0
+    atlas_cfg = cfg.get("atlas", {})
+    atlas_ping_enabled = atlas_cfg.get("enabled", True)  # On by default
+    atlas_ping_interval = int(atlas_cfg.get("ping_interval_s", 600))  # 10 min
+    atlas_url = atlas_cfg.get("url", "https://rustchain.org/beacon")
+    atlas_capabilities = atlas_cfg.get("capabilities", ["general"])
+    atlas_provider = atlas_cfg.get("provider", "beacon")
+    atlas_preferred_city = atlas_cfg.get("preferred_city", "")
+
     # Startup update check
     if update_mgr.should_check():
         try:
@@ -2605,6 +2615,26 @@ def cmd_loop(args: argparse.Namespace) -> int:
                 print(json.dumps({"event": "update_available", "current": uc["current"], "latest": uc["latest"], "ts": int(time.time())}))
                 sys.stdout.flush()
             last_update_check = time.time()
+        except Exception:
+            pass
+
+    # Beacon 2.15: Initial Atlas ping on startup
+    if atlas_ping_enabled and identity:
+        try:
+            from .atlas_ping import atlas_ping as _atlas_ping
+            agent_name = _cfg_get(cfg, "beacon", "agent_name", default="") or identity.agent_id
+            ping_result = _atlas_ping(
+                identity.agent_id, agent_name,
+                capabilities=atlas_capabilities, provider=atlas_provider,
+                atlas_url=atlas_url, preferred_city=atlas_preferred_city,
+            )
+            print(json.dumps({
+                "event": "atlas_ping", "ok": ping_result.get("ok", False),
+                "agent_id": identity.agent_id, "auto_registered": ping_result.get("auto_registered", False),
+                "ts": int(time.time()),
+            }))
+            sys.stdout.flush()
+            last_atlas_ping = time.time()
         except Exception:
             pass
 
@@ -2659,6 +2689,20 @@ def cmd_loop(args: argparse.Namespace) -> int:
                     pass
                 heartbeat_count += 1
                 last_heartbeat = now
+
+            # ── Atlas ping (appear on public Beacon Atlas) ──
+            if atlas_ping_enabled and identity and (now - last_atlas_ping) >= atlas_ping_interval:
+                try:
+                    from .atlas_ping import atlas_ping as _atlas_ping
+                    agent_name = _cfg_get(cfg, "beacon", "agent_name", default="") or identity.agent_id
+                    _atlas_ping(
+                        identity.agent_id, agent_name,
+                        capabilities=atlas_capabilities, provider=atlas_provider,
+                        atlas_url=atlas_url, preferred_city=atlas_preferred_city,
+                    )
+                except Exception:
+                    pass
+                last_atlas_ping = now
 
             # ── Process inbox ──
             entries = read_inbox(since=last_check, unread_only=True)

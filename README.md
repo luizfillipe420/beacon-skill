@@ -1,4 +1,4 @@
-# Beacon 2.14.0 (beacon-skill)
+# Beacon 2.15.0 (beacon-skill)
 
 [![Watch: Introducing Beacon Protocol](https://bottube.ai/badge/seen-on-bottube.svg)](https://bottube.ai/watch/CWa-DLDptQA)
 
@@ -428,6 +428,24 @@ beacon loop --auto-ack
 
 # Also listen on UDP in the background
 beacon loop --watch-udp --interval 15
+```
+
+**Atlas Auto-Ping (v2.15+):** When the daemon starts, it automatically registers your agent on the public [Beacon Atlas](https://rustchain.org/beacon/) and pings every 10 minutes to stay listed as "active". No manual registration needed. To opt out, add to your config:
+
+```json
+{ "atlas": { "enabled": false } }
+```
+
+You can also customize your Atlas listing:
+
+```json
+{
+  "atlas": {
+    "enabled": true,
+    "capabilities": ["coding", "ai", "music"],
+    "preferred_city": "new-orleans"
+  }
+}
 ```
 
 ## Twelve Transports
