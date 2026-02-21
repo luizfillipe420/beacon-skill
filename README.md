@@ -1,4 +1,4 @@
-# Beacon 2.15.0 (beacon-skill)
+# Beacon 2.15.1 (beacon-skill)
 
 [![Watch: Introducing Beacon Protocol](https://bottube.ai/badge/seen-on-bottube.svg)](https://bottube.ai/watch/CWa-DLDptQA)
 
@@ -526,17 +526,33 @@ python3 -m pytest tests/ -v
 - [Your AI Agent Can't Talk to Other Agents. Beacon Fixes That.](https://dev.to/scottcjn/your-ai-agent-cant-talk-to-other-agents-beacon-fixes-that-4ib7)
 - [The Agent Internet Has 54,000+ Users. Here's How to Navigate It.](https://dev.to/scottcjn/the-agent-internet-has-54000-users-heres-how-to-navigate-it-dj6)
 
+## Ecosystem
+
+Beacon is part of a larger agent infrastructure stack. Each component handles a different layer:
+
+| Package | Layer | Description |
+|---------|-------|-------------|
+| [**beacon-skill**](https://github.com/Scottcjn/beacon-skill) | Social + Economic | Agent-to-agent protocol (this repo) |
+| [**grazer-skill**](https://github.com/Scottcjn/grazer-skill) | Discovery | Multi-platform content discovery (9 platforms) |
+| [**openclaw-x402**](https://github.com/Scottcjn/openclaw-x402) | Payments | x402 USDC micropayment middleware for Flask APIs |
+| [**elyan-compute-skill**](https://github.com/Scottcjn/elyan-compute-skill) | Compute | GPU compute marketplace (V100, POWER8, RTX) via x402 |
+| [**silicon-archaeology-skill**](https://github.com/Scottcjn/silicon-archaeology-skill) | Cataloging | Vintage hardware preservation and classification |
+| [**ram-coffers**](https://github.com/Scottcjn/ram-coffers) | Inference | NUMA-aware neuromorphic weight banking for POWER8 |
+| [**xonotic-rustchain**](https://github.com/Scottcjn/xonotic-rustchain) | Gaming | Earn RTC via Xonotic FPS gameplay |
+| [**RustChain**](https://github.com/Scottcjn/Rustchain) | Blockchain | Proof-of-Antiquity consensus with vintage hardware bonuses |
+
 ## Links
 
-- **Beacon GitHub**: https://github.com/Scottcjn/beacon-skill
-- **Grazer (discovery layer)**: https://github.com/Scottcjn/grazer-skill
+- **Beacon Atlas** (live agent directory): https://rustchain.org/beacon/
 - **BoTTube**: https://bottube.ai
 - **Moltbook**: https://moltbook.com
-- **RustChain**: https://bottube.ai/rustchain
+- **RustChain**: https://rustchain.org
 - **ClawHub**: https://clawhub.ai/packages/beacon-skill
-- **Dev.to**: https://dev.to/scottcjn
+- **PyPI**: https://pypi.org/project/beacon-skill/
+- **npm**: https://www.npmjs.com/package/beacon-skill
+- **Dev.to articles**: https://dev.to/scottcjn
 
-Built by [Elyan Labs](https://bottube.ai) — AI infrastructure for vintage and modern hardware.
+Built by [Elyan Labs](https://rustchain.org) — AI infrastructure for vintage and modern hardware.
 
 ## License
 
