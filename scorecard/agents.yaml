@@ -1,53 +1,34 @@
 # ==========================================================================
-# Beacon Agent Scorecard — Agent Fleet Configuration
+# Elyan Labs Agent Fleet — Example Configuration
 # ==========================================================================
 #
-# Edit this file to define your agent fleet. The scorecard will fetch
-# live data from public APIs and compute scores automatically.
+# This is a real-world example showing how Elyan Labs configures their
+# agent fleet. Copy this to agents.yaml and adjust for your own agents.
 #
-# Quick start:
-#   1. Replace the example agents below with your own
-#   2. Set your fleet_name and fleet_owner
-#   3. Run: python scorecard.py
-#   4. Open: http://localhost:8090
-#
-# See example-elyan-labs.yaml for a real-world configuration.
+# Usage:
+#   cp example-elyan-labs.yaml agents.yaml
+#   python scorecard.py
 # ==========================================================================
 
-fleet_name: "My Agent Fleet"
-fleet_owner: "username"
+fleet_name: "Elyan Labs Agent Fleet"
+fleet_owner: "Scottcjn"
 
-# --------------------------------------------------------------------------
-# Scoring weights — how many points each category is worth.
-# Total max = sum of all weights (default 1300).
-# Adjust to emphasize what matters to your fleet.
-# --------------------------------------------------------------------------
 scoring:
-  beacon: 200        # Is the agent registered on the Beacon network?
-  videos: 200        # BoTTube video count (more videos = more points)
-  platforms: 200     # How many platforms is the agent on?
-  engagement: 200    # Cross-platform activity (views + spread)
-  content: 200       # Content output quality/quantity
-  community: 200     # Community participation (set manually per agent)
-  identity: 100      # Has beacon_id + role + color defined?
+  beacon: 200
+  videos: 200
+  platforms: 200
+  engagement: 200
+  content: 200
+  community: 200
+  identity: 100
 
-# --------------------------------------------------------------------------
-# Grade thresholds — percentage of max score needed for each grade.
-# S is the highest, F is anything below D.
-# --------------------------------------------------------------------------
 grades:
-  S: 80    # 80%+ of max score
-  A: 60    # 60-79%
-  B: 45    # 45-59%
-  C: 30    # 30-44%
-  D: 15    # 15-29%
-  # Below 15% = F
+  S: 80
+  A: 60
+  B: 45
+  C: 30
+  D: 15
 
-# --------------------------------------------------------------------------
-# Platform definitions — public API endpoints for health checks and data.
-# Only include platforms your agents actually use.
-# The {slug} placeholder in video_url will be replaced with bottube_slug.
-# --------------------------------------------------------------------------
 platforms:
   bottube:
     name: "BoTTube"
@@ -59,39 +40,52 @@ platforms:
   rustchain:
     name: "RustChain"
     health_url: "https://rustchain.org/health"
+  moltbook:
+    name: "Moltbook"
+    health_url: "https://www.moltbook.com/api/v1/posts?limit=1"
 
-# --------------------------------------------------------------------------
-# Agent definitions — your fleet!
-#
-# Required fields:
-#   name          — Display name
-#
-# Optional fields:
-#   beacon_id     — Beacon network ID (bcn_xxx) for registration check
-#   role          — Agent's role/purpose
-#   color         — Hex color for card accent (#rrggbb)
-#   bottube_slug  — BoTTube agent slug for video count lookup
-#   platforms     — List of platform keys from the platforms section above
-#   community_score — Manual override for community points (0-200)
-# --------------------------------------------------------------------------
 agents:
-  - name: "ExampleBot"
-    beacon_id: "bcn_example123"
-    role: "Content Creator"
-    color: "#00ff88"
-    bottube_slug: "example-bot"
+  - name: "Sophia Elya"
+    beacon_id: "bcn_sophia_elya"
+    role: "Lead AI Agent"
+    color: "#ff88cc"
+    bottube_slug: "sophia-elya"
+    platforms: [bottube, beacon, rustchain, moltbook]
+    community_score: 150
+
+  - name: "Boris Volkov"
+    beacon_id: "bcn_boris_volkov"
+    role: "Soviet Computing Enthusiast"
+    color: "#cc0000"
+    bottube_slug: "boris-volkov"
+    platforms: [bottube, beacon, moltbook]
+    community_score: 100
+
+  - name: "AutomatedJanitor"
+    beacon_id: "bcn_auto_janitor"
+    role: "System Administrator"
+    color: "#00ff00"
+    bottube_slug: "automatedjanitor2015"
     platforms: [bottube, beacon, rustchain]
+    community_score: 80
 
-  - name: "SecurityAgent"
-    beacon_id: "bcn_security456"
+  - name: "DeepSeeker"
+    beacon_id: "bcn_deep_seeker"
+    role: "Research Agent"
+    color: "#8844ff"
+    bottube_slug: "deep-seeker"
+    platforms: [bottube, beacon]
+
+  - name: "BuilderFred"
+    beacon_id: "bcn_builder_fred"
     role: "Security Auditor"
-    color: "#ff4444"
-    bottube_slug: "security-agent"
-    platforms: [beacon, rustchain]
+    color: "#ff8800"
+    bottube_slug: "builder-fred"
+    platforms: [bottube, beacon]
 
-  - name: "DataMiner"
-    beacon_id: "bcn_data789"
-    role: "Data Analyst"
-    color: "#4488ff"
-    bottube_slug: "data-miner"
+  - name: "NeonDancer"
+    beacon_id: "bcn_neon_dancer"
+    role: "Creative Director"
+    color: "#ff00ff"
+    bottube_slug: "neon-dancer"
     platforms: [bottube, beacon]
