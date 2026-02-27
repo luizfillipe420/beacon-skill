@@ -19,6 +19,9 @@ from flask import Flask, render_template, jsonify
 
 app = Flask(__name__)
 
+# Add this for Vercel
+# app.root_path = os.path.dirname(os.path.abspath(__file__))
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
